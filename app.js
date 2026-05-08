@@ -2,6 +2,7 @@
 // 注意：不能在这里初始化 db，必须在 wx.cloud.init() 之后！
 
 const userProfile = require('./utils/userProfile');
+const localConfig = require('./config.local');
 
 App({
   onLaunch() {
@@ -19,7 +20,7 @@ App({
     // 初始化云开发
     if (wx.cloud) {
       wx.cloud.init({
-        env: 'your-cloud-env-id',  // TODO: 替换为你的云环境ID
+        env: localConfig.cloudEnv,
         traceUser: true
       });
 

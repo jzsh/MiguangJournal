@@ -23,7 +23,7 @@ Page({
 
   // 加载版本号（正式版从微信读取，开发环境降级使用下面手动维护的版本）
   _loadVersion() {
-    const CURRENT_VERSION = '0.0.7';  // 每次上传新版本时同步修改这里
+    const CURRENT_VERSION = '1.0.0';  // 每次上传新版本时同步修改这里
     try {
       const accountInfo = wx.getAccountInfoSync();
       const ver = accountInfo.miniProgram.version;

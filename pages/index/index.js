@@ -21,17 +21,30 @@ Page({
     pageSize: 15,
     hasMore: true,
     loading: false,
-    loadMoreStatus: ''  // '', 'loading', 'nomore'
+    loadMoreStatus: '',  // '', 'loading', 'nomore'
+    // 滚动位置保持
+    _savedScrollTop: 0,  // 记录离开前的滚动位置
+    _focusedDiaryId: null  // 记录点进去的日记 ID
   },
 
   goToAddAnniversary() {
     wx.navigateTo({ url: '/pages/add_anniversary/add_anniversary' });
   },
 
+  // 页面滚动时记录当前位置
+  onPageScroll(e) {
+    this.data._savedScrollTop = e.scrollTop;
+  },
+
   onDiaryTap(e) {
     const index = e.currentTarget.dataset.index;
     const diary = this.data.allList[index];
     if (!diary) return;
+    // 记录点击的日记ID 和 当前滚动位置
+    this.setData({
+      _focusedDiaryId: diary._id,
+      _savedScrollTop: this.data._savedScrollTop
+    });
     wx.navigateTo({
       url: '/pages/diary_detail/diary_detail',
       success(res) {
@@ -154,10 +167,45 @@ Page({
   },
 
   onShow() {
+    // 第1步：立即恢复滚动位置（同步执行，不等任何异步操作！）
+    if (this.data._savedScrollTop > 0) {
+      wx.pageScrollTo({ scrollTop: this.data._savedScrollTop, duration: 0 });
+    }
+
+    // 第2步：局部更新被编辑的日记（不重载列表，列表长度不变）
     if (wx.getStorageSync('needRefreshHome')) {
       wx.removeStorageSync('needRefreshHome');
-      this._loadCloudDiaries(true); // 刷新时重新加载
+      this._updateEditedDiary();
     }
+  },
+
+  // 局部更新被编辑的日记（不重载整个列表，列表长度不变！）
+  _updateEditedDiary() {
+    const focusedId = this.data._focusedDiaryId;
+    if (!focusedId) return;
+
+    const updatedKey = 'diaryUpdated_' + focusedId;
+    const updatedData = wx.getStorageSync(updatedKey);
+    if (!updatedData) return;
+
+    wx.removeStorageSync(updatedKey);
+
+    const cloudDiaries = [...this.data.cloudDiaries];
+    const idx = cloudDiaries.findIndex(d => d._id === focusedId);
+    if (idx === -1) return;
+
+    const rawDetail = updatedData.detail || '';
+    const dynamicSummary = rawDetail.length > 60 ? rawDetail.substring(0, 60) + '…' : (rawDetail || '');
+    cloudDiaries[idx] = {
+      ...cloudDiaries[idx],
+      ...updatedData,
+      summary: dynamicSummary,
+      content: updatedData.content || (updatedData.detail ? updatedData.detail.split('\n') : []),
+      _isPublished: true
+    };
+    this.setData({ cloudDiaries });
+    this._buildAllList();
+    this._updateSwiper();
   },
 
   // 下拉刷新
@@ -169,7 +217,7 @@ Page({
     });
   },
 
-  // 触底加载更多
+  // 触底加载更多（原生页面滚动，onReachBottom 正常触发）
   onReachBottom() {
     if (this.data.loading || !this.data.hasMore) return;
     this.setData({ loadMoreStatus: 'loading' });
