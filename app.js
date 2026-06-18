@@ -2,7 +2,7 @@
 // 注意：不能在这里初始化 db，必须在 wx.cloud.init() 之后！
 
 const userProfile = require('./utils/userProfile');
-const localConfig = require('./config.local');
+const localConfig = require('./config');
 
 App({
   onLaunch() {
