@@ -119,6 +119,27 @@ Page({
           else if (operationType === 'add') log._displayTitle = '创建用户资料';
           else log._displayTitle = '修改用户资料';
           break;
+        case 'diary_like':
+          log._displayTitle = entityContent.action || '点赞操作';
+          break;
+        case 'email_bind':
+          log._displayTitle = entityContent.action || '邮箱操作';
+          break;
+        case 'photo':
+          log._displayTitle = entityContent.date || '照片';
+          break;
+        case 'feedback':
+          log._displayTitle = entityContent.contentPreview || '反馈';
+          break;
+        case 'data_clear':
+          log._displayTitle = `清除 ${entityContent.totalDeleted || 0} 条数据`;
+          break;
+        case 'data_import':
+          log._displayTitle = `导入 ${entityContent.importedCount || 0} 条数据`;
+          break;
+        case 'comment_orphan_clean':
+          log._displayTitle = `清理 ${entityContent.count || 0} 条孤儿评论`;
+          break;
         default:
           const keys = Object.keys(entityContent).filter(k =>
             !k.startsWith('_') && entityContent[k] != null && entityContent[k] !== ''
@@ -168,6 +189,27 @@ Page({
           log._displayDetail = tParts.join(' | ') || (entityContent.thingText || '');
           break;
         }
+        case 'diary_like':
+          log._displayDetail = `${entityContent.action || '点赞'}（${entityContent.likeCount} 赞）`;
+          break;
+        case 'email_bind':
+          log._displayDetail = entityContent.email ? `${entityContent.action}：${entityContent.email}` : (entityContent.action || '');
+          break;
+        case 'photo':
+          log._displayDetail = entityContent.date ? `日期：${entityContent.date}` : '照片';
+          break;
+        case 'feedback':
+          log._displayDetail = entityContent.contentPreview || '反馈';
+          break;
+        case 'data_clear':
+          log._displayDetail = `共删除 ${entityContent.totalDeleted || 0} 条`;
+          break;
+        case 'data_import':
+          log._displayDetail = `成功 ${entityContent.importedCount || 0} 条，失败 ${entityContent.errorCount || 0} 条`;
+          break;
+        case 'comment_orphan_clean':
+          log._displayDetail = `清理 ${entityContent.count || 0} 条`;
+          break;
         default:
           const dKeys = Object.keys(entityContent);
           log._displayDetail = dKeys.length > 0
@@ -610,10 +652,13 @@ Page({
     if (!log) return '未知操作';
     const { operationType, entityType } = log;
     const typeMap = { add: '添加', delete: '删除', update: '修改', unknown: '未知' };
-    const entityMap = { 
+    const entityMap = {
       diary: '日记', anniversary: '纪念日', comment: '评论', sticky_note: '便利贴',
       quick_entry: '快捷入口', hobby: '爱好标签', couple_thing: '情侣事项', user: '用户资料',
-      comment_batch: '评论', couple_thing_batch: '情侣事项'
+      comment_batch: '评论', couple_thing_batch: '情侣事项',
+      photo: '照片', feedback: '反馈', diary_like: '日记点赞',
+      email_bind: '邮箱绑定', comment_orphan_clean: '孤儿评论清理',
+      data_clear: '数据清除', data_import: '数据导入'
     };
     
     const typeText = typeMap[operationType] || operationType || '未知';

@@ -301,7 +301,7 @@ Page({
     this.setData({ liked, likeCount });
     const diary = this.data.diary;
     if (diary._id) {
-      db.collection('diaries').doc(diary._id).update({ data: { likeCount } }).catch(() => {});
+      cloud.updateDiaryLike(diary._id, likeCount).catch(() => {});
     }
   },
 
@@ -417,7 +417,7 @@ Page({
             this.setData({ comments });
             wx.showToast({ title: '已删除', icon: 'success' });
           } else {
-            db.collection('comments').doc(comment.id).remove().then(() => {
+            cloud.deleteComment(comment.id).then(() => {
               const comments = [...this.data.comments];
               comments.splice(index, 1);
               this.setData({ comments });

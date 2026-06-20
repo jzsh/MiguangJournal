@@ -2,8 +2,9 @@
 node_modules/
 miniprogram_npm/
 
-# 本地私密配置（包含真实 appid 和云环境 ID）—— 不要提交！
+# 本地私密配置（包含真实 appid、SMTP 等）—— 不要提交！
 private-data.js
+cloudfunctions/**/private-data.js
 
 # AI 工具配置
 .codebuddy/

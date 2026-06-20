@@ -1,0 +1,18 @@
+<view class="container">
+  <view class="desc">
+    <text>绑定邮箱后，当日记有更新（新日记、评论、点赞等）时，会通过邮件实时通知你。</text>
+  </view>
+
+  <view class="form">
+    <view class="input-group">
+      <text class="label">邮箱地址</text>
+      <input class="input" type="text" placeholder="请输入邮箱" value="{{email}}" bindinput="onEmailInput" />
+    </view>
+    <button class="btn" bindtap="onBind" loading="{{binding}}">{{email ? '更新邮箱' : '绑定邮箱'}}</button>
+    <button class="btn-unbind" wx:if="{{email}}" bindtap="onUnbind">解绑邮箱</button>
+  </view>
+
+  <view class="status" wx:if="{{status}}">
+    <text class="{{status.type === 'success' ? 'success' : 'error'}}">{{status.msg}}</text>
+  </view>
+</view>

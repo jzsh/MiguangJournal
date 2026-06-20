@@ -24,10 +24,15 @@ function addDiary(diary) {
       updatedAt: db.serverDate()
     }
   }).then(res => {
-    // 记录操作日志
+    // 记录操作日志（传递完整日记内容，用于邮件通知）
     _logOperationInternal('add', 'diary', res._id, {
       title: diary.title,
-      date: diary.date
+      detail: diary.detail,
+      date: diary.date,
+      mood: diary.mood || '',
+      weather: diary.weather || '',
+      location: diary.location || '',
+      content: diary.content || []
     });
     return res;
   });
@@ -35,50 +40,66 @@ function addDiary(diary) {
 
 // 更新日记
 function updateDiary(id, diary) {
-  const updateData = {
-    title: diary.title,
-    detail: diary.detail,
-    date: diary.date,
-    images: diary.images || [],
-    coverImage: diary.coverImage || '',
-    mood: diary.mood || '',
-    weather: diary.weather || '',
-    location: diary.location || '',
-    content: diary.content || [],
-    updatedAt: db.serverDate()
-  };
-  
-  // 如果 locationData 是对象，需要先删除再设置（解决 null 无法更新子字段的问题）
-  if (diary.locationData && diary.locationData.latitude) {
-    // 先删除旧字段（如果之前是 null）
-    return db.collection('diaries').doc(id).update({
-      data: {
-        locationData: db.command.remove()
+  // 先获取旧数据，用于 diff 对比
+  return db.collection('diaries').doc(id).get().then(oldRes => {
+    const oldData = oldRes.data || {};
+
+    const updateData = {
+      title: diary.title,
+      detail: diary.detail,
+      date: diary.date,
+      images: diary.images || [],
+      coverImage: diary.coverImage || '',
+      mood: diary.mood || '',
+      weather: diary.weather || '',
+      location: diary.location || '',
+      content: diary.content || [],
+      updatedAt: db.serverDate()
+    };
+
+    // 构建 diff 数据
+    const diffData = { old: {}, new: {} };
+    const fieldsToCompare = ['title', 'detail', 'date', 'mood', 'weather', 'location'];
+    let hasDiff = false;
+    for (const field of fieldsToCompare) {
+      const oldVal = oldData[field] || '';
+      const newVal = diary[field] || '';
+      if (oldVal !== newVal) {
+        diffData.old[field] = oldVal;
+        diffData.new[field] = newVal;
+        hasDiff = true;
       }
-    }).then(() => {
-      // 再设置新值
-      updateData.locationData = diary.locationData;
-      return db.collection('diaries').doc(id).update({ data: updateData }).then(res => {
-        // 记录操作日志
-        _logOperationInternal('update', 'diary', id, {
-          title: diary.title,
-          date: diary.date
+    }
+    if (!hasDiff) { diffData.unchanged = true; }
+    diffData.title = diary.title;
+    diffData.date = diary.date;
+
+    // 如果 locationData 是对象，需要先删除再设置（解决 null 无法更新子字段的问题）
+    if (diary.locationData && diary.locationData.latitude) {
+      // 先删除旧字段（如果之前是 null）
+      return db.collection('diaries').doc(id).update({
+        data: {
+          locationData: db.command.remove()
+        }
+      }).then(() => {
+        // 再设置新值
+        updateData.locationData = diary.locationData;
+        return db.collection('diaries').doc(id).update({ data: updateData }).then(res => {
+          // 记录操作日志（带 diff 数据）
+          _logOperationInternal('update', 'diary', id, diffData);
+          return res;
         });
+      });
+    } else {
+      // 否则直接设为 null
+      updateData.locationData = diary.locationData || null;
+      return db.collection('diaries').doc(id).update({ data: updateData }).then(res => {
+        // 记录操作日志（带 diff 数据）
+        _logOperationInternal('update', 'diary', id, diffData);
         return res;
       });
-    });
-  } else {
-    // 否则直接设为 null
-    updateData.locationData = diary.locationData || null;
-    return db.collection('diaries').doc(id).update({ data: updateData }).then(res => {
-      // 记录操作日志
-      _logOperationInternal('update', 'diary', id, {
-        title: diary.title,
-        date: diary.date
-      });
-      return res;
-    });
-  }
+    }
+  });
 }
 
 // 删除日记
@@ -89,10 +110,15 @@ function deleteDiary(id) {
     // 删除日记
     return db.collection('diaries').doc(id).remove().then(res => {
       // 记录操作日志
-      _logOperationInternal('delete', 'diary', id, {
-        title: diaryData.title,
-        date: diaryData.date
-      });
+    _logOperationInternal('delete', 'diary', id, {
+      title: diaryData.title,
+      detail: diaryData.detail || '',
+      date: diaryData.date,
+      mood: diaryData.mood || '',
+      weather: diaryData.weather || '',
+      location: diaryData.location || '',
+      content: diaryData.content || []
+    });
       return res;
     });
   });
@@ -190,7 +216,165 @@ function cleanOrphanComments() {
       const tasks = orphans.map(c =>
         dbTemp.collection('comments').doc(c._id).remove().catch(() => {})
       );
-      return Promise.all(tasks).then(() => ({ cleaned: orphans.length }));
+      return Promise.all(tasks).then(() => {
+        // 记录操作日志
+        _logOperationInternal('delete', 'comment_orphan_clean', '', {
+          count: orphans.length,
+          reason: '日记已删除，自动清理孤儿评论'
+        });
+        return { cleaned: orphans.length };
+      });
+    });
+  });
+}
+
+// ==================== 照片集合 ====================
+
+// 添加照片
+function addPhoto(fileID, date) {
+  return db.collection('photos').add({
+    data: {
+      fileID: fileID,
+      date: date || '',
+      createdAt: db.serverDate()
+    }
+  }).then(res => {
+    _logOperationInternal('add', 'photo', res._id, {
+      fileID: fileID,
+      date: date || ''
+    });
+    return res;
+  });
+}
+
+// 删除照片
+function deletePhoto(id) {
+  return db.collection('photos').doc(id).get().then(photoRes => {
+    const photoData = photoRes.data;
+    return db.collection('photos').doc(id).remove().then(res => {
+      _logOperationInternal('delete', 'photo', id, {
+        fileID: photoData ? photoData.fileID : '',
+        date: photoData ? photoData.date : ''
+      });
+      return res;
+    });
+  });
+}
+
+// 恢复照片（从回收站恢复）
+function restorePhoto(fileID, date) {
+  return db.collection('photos').add({
+    data: {
+      fileID: fileID,
+      date: date || '',
+      createdAt: db.serverDate()
+    }
+  }).then(res => {
+    _logOperationInternal('add', 'photo', res._id, {
+      fileID: fileID,
+      date: date || '',
+      restored: true
+    });
+    return res;
+  });
+}
+
+// ==================== 反馈集合 ====================
+
+// 添加反馈
+function addFeedback(content, contact) {
+  return db.collection('feedback').add({
+    data: {
+      content: content,
+      contact: contact || '',
+      createdAt: db.serverDate()
+    }
+  }).then(res => {
+    _logOperationInternal('add', 'feedback', res._id, {
+      contentPreview: content.length > 30 ? content.substring(0, 30) + '...' : content,
+      hasContact: !!contact
+    });
+    return res;
+  });
+}
+
+// ==================== 点赞 ====================
+
+// 更新日记点赞数
+function updateDiaryLike(diaryId, likeCount) {
+  return db.collection('diaries').doc(diaryId).update({
+    data: { likeCount: likeCount }
+  }).then(res => {
+    _logOperationInternal('update', 'diary_like', diaryId, {
+      diaryId: diaryId,
+      likeCount: likeCount,
+      action: likeCount > 0 ? '点赞' : '取消点赞'
+    });
+    return res;
+  });
+}
+
+// ==================== 邮箱绑定 ====================
+
+// 绑定邮箱
+function bindEmail(userId, email) {
+  return db.collection('users').doc(userId).update({
+    data: { email: email }
+  }).then(res => {
+    _logOperationInternal('update', 'email_bind', userId, {
+      email: email,
+      action: '绑定邮箱'
+    });
+    return res;
+  });
+}
+
+// 解绑邮箱
+function unbindEmail(userId) {
+  return db.collection('users').doc(userId).update({
+    data: { email: '' }
+  }).then(res => {
+    _logOperationInternal('update', 'email_bind', userId, {
+      action: '解绑邮箱'
+    });
+    return res;
+  });
+}
+
+// ==================== 恢复日记 ====================
+
+// 恢复日记（从回收站恢复）
+function restoreDiary(diaryData) {
+  return db.collection('diaries').add({
+    data: {
+      ...diaryData,
+      createdAt: db.serverDate(),
+      updatedAt: db.serverDate()
+    }
+  }).then(res => {
+    _logOperationInternal('add', 'diary', res._id, {
+      title: diaryData.title || '',
+      date: diaryData.date || '',
+      restored: true
+    });
+    return res;
+  });
+}
+
+// ==================== 单条评论删除 ====================
+
+// 删除单条评论
+function deleteComment(commentId) {
+  return db.collection('comments').doc(commentId).get().then(commentRes => {
+    const commentData = commentRes.data;
+    return db.collection('comments').doc(commentId).remove().then(res => {
+      _logOperationInternal('delete', 'comment', commentId, {
+        diaryId: commentData ? commentData.diaryId : '',
+        contentPreview: commentData && commentData.content
+          ? (commentData.content.length > 20 ? commentData.content.substring(0, 20) + '...' : commentData.content)
+          : ''
+      });
+      return res;
     });
   });
 }
@@ -856,17 +1040,12 @@ function updateUserProfile(userId, profile) {
         data: updateData
       }).then(updateRes => {
         // 记录操作日志
-        logOperation(userId, {
-          operationType: 'update',
-          entityType: 'user',
-          entityId: userId,
-          entityContent: {
-            nickName: profile.nickName || '',
-            gender: profile.gender !== undefined ? profile.gender : 2,
-            hasAvatar: !!profile.avatarUrl,
-            hasPhone: !!profile.phone,
-            hasAge: profile.age !== undefined
-          }
+        _logOperationInternal('update', 'user', userId, {
+          nickName: profile.nickName || '',
+          gender: profile.gender !== undefined ? profile.gender : 2,
+          hasAvatar: !!profile.avatarUrl,
+          hasPhone: !!profile.phone,
+          hasAge: profile.age !== undefined
         });
         return updateRes;
       });
@@ -879,17 +1058,12 @@ function updateUserProfile(userId, profile) {
         data: updateData
       }).then(addRes => {
         // 记录操作日志
-        logOperation(userId, {
-          operationType: 'add',
-          entityType: 'user',
-          entityId: userId,
-          entityContent: {
-            nickName: profile.nickName || '',
-            gender: profile.gender !== undefined ? profile.gender : 2,
-            hasAvatar: !!profile.avatarUrl,
-            hasPhone: !!profile.phone,
-            hasAge: profile.age !== undefined
-          }
+        _logOperationInternal('add', 'user', userId, {
+          nickName: profile.nickName || '',
+          gender: profile.gender !== undefined ? profile.gender : 2,
+          hasAvatar: !!profile.avatarUrl,
+          hasPhone: !!profile.phone,
+          hasAge: profile.age !== undefined
         });
         return addRes;
       });
@@ -904,17 +1078,12 @@ function updateUserProfile(userId, profile) {
         data: updateData
       }).then(addRes => {
         // 记录操作日志
-        logOperation(userId, {
-          operationType: 'add',
-          entityType: 'user',
-          entityId: userId,
-          entityContent: {
-            nickName: profile.nickName || '',
-            gender: profile.gender !== undefined ? profile.gender : 2,
-            hasAvatar: !!profile.avatarUrl,
-            hasPhone: !!profile.phone,
-            hasAge: profile.age !== undefined
-          }
+        _logOperationInternal('add', 'user', userId, {
+          nickName: profile.nickName || '',
+          gender: profile.gender !== undefined ? profile.gender : 2,
+          hasAvatar: !!profile.avatarUrl,
+          hasPhone: !!profile.phone,
+          hasAge: profile.age !== undefined
         });
         return addRes;
       });
@@ -1005,6 +1174,24 @@ function getCurrentUserId() {
   }
 }
 
+// 发送操作通知（触发邮件推送），附带操作者信息
+function notifyEvent(operationType, entityType, entityContent, extraInfo = {}) {
+  const { userId, operatorName, operationTime } = extraInfo
+  wx.cloud.callFunction({
+    name: 'notifyDiary',
+    data: {
+      operationType,
+      entityType,
+      entityContent: entityContent || {},
+      userId: userId || '',
+      operatorName: operatorName || '',
+      operationTime: operationTime || ''
+    }
+  }).catch(err => {
+    console.warn('[notifyEvent] 通知失败(不影响主流程):', err)
+  })
+}
+
 // 记录操作日志（内部使用）
 function _logOperationInternal(operationType, entityType, entityId, entityContent, additionalInfo = {}) {
   const userId = getCurrentUserId();
@@ -1012,7 +1199,14 @@ function _logOperationInternal(operationType, entityType, entityId, entityConten
     console.warn('无法获取用户ID，跳过操作日志记录');
     return Promise.resolve();
   }
-  
+
+  // 读取本地缓存的用户昵称
+  let operatorName = '';
+  try {
+    const cache = wx.getStorageSync('userProfile');
+    if (cache && cache.nickName) operatorName = cache.nickName;
+  } catch(e) {}
+
   const logData = {
     userId: userId,
     operationType: operationType,
@@ -1022,9 +1216,17 @@ function _logOperationInternal(operationType, entityType, entityId, entityConten
     operationTime: db.serverDate(),
     additionalInfo: additionalInfo
   };
-  
+
+  // 记录日志 + 发送通知（异步，不影响主流程）
   return db.collection('operation_logs').add({
     data: logData
+  }).then(() => {
+    // 日志记录成功后，触发邮件通知（带操作者信息）
+    notifyEvent(operationType, entityType, entityContent, {
+      userId,
+      operatorName,
+      operationTime: new Date().toISOString()
+    })
   }).catch(err => {
     console.error('记录操作日志失败:', err);
     return Promise.resolve();
@@ -1085,6 +1287,21 @@ module.exports = {
   // 用户资料相关
   updateUserProfile,
   getUserProfile,
+  // 照片相关
+  addPhoto,
+  deletePhoto,
+  restorePhoto,
+  // 反馈相关
+  addFeedback,
+  // 点赞相关
+  updateDiaryLike,
+  // 邮箱绑定相关
+  bindEmail,
+  unbindEmail,
+  // 恢复日记
+  restoreDiary,
+  // 单条评论删除
+  deleteComment,
   // 操作日志相关
   logOperation,
   getUserOperationLogs,
@@ -1334,6 +1551,13 @@ async function clearAllData() {
   }
 
   wx.hideLoading();
+
+  // 记录操作日志
+  _logOperationInternal('delete', 'data_clear', '', {
+    totalDeleted: results.totalDeleted,
+    collections: Object.keys(results.collections).filter(c => results.collections[c].count > 0)
+  });
+
   return results;
 }
 
@@ -1375,6 +1599,14 @@ async function doImport(importData) {
     }
 
     wx.hideLoading();
+
+    // 记录操作日志
+    _logOperationInternal('add', 'data_import', '', {
+      importedCount,
+      errorCount,
+      collections: sortedCols
+    });
+
     return { summary: `✅ 成功: ${importedCount} 条\n❌ 失败: ${errorCount} 条`, errors };
   } catch (err) {
     wx.hideLoading();

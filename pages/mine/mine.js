@@ -14,6 +14,7 @@ Page({
     menuList: [
       { icon: '❤️', title: '我的收藏', desc: '收藏的日记和内容', page: '/pages/favorites/favorites' },
       { icon: '📋', title: '历史记录', desc: '查看所有操作记录', page: '/pages/operation_history/operation_history' },
+      { icon: '📧', title: '绑定邮箱', desc: '开启邮件通知，日记更新实时知晓', page: '/pages/bind_email/bind_email' },
       { icon: '💾', title: '数据管理', desc: '导入/导出数据库数据', action: 'dataManagement' },
       { icon: '⚙️', title: '个人设置', desc: '修改昵称、头像等资料', page: '/pages/settings/settings' },
       { icon: '📝', title: '意见反馈', desc: '提交反馈和建议', page: '/pages/feedback/feedback' },
@@ -182,6 +183,8 @@ Page({
   },
 
   onShow() {
+    const tb = this.getTabBar()
+    if (tb) tb.setData({ selected: 3 })
     this._updateCounts();
     const userId = wx.getStorageSync('userId');
     if (userId) {

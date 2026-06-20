@@ -4,6 +4,7 @@ const cloud = require('../../utils/cloud');
 
 Page({
   data: {
+    navPaddingTop: 0,
     swiperList: [],
     demoDiaryList: [
       {
@@ -163,19 +164,30 @@ Page({
   },
 
   onLoad() {
+    // 获取状态栏高度，用于自定义导航栏
+    try {
+      const sys = wx.getSystemInfoSync();
+      this.setData({ navPaddingTop: sys.statusBarHeight || 20 });
+    } catch (e) {
+      this.setData({ navPaddingTop: 20 });
+    }
     this._loadCloudDiaries(true); // 首次加载
   },
 
   onShow() {
+    // 通知 tab bar 当前页
+    const tb = this.getTabBar()
+    if (tb) tb.setData({ selected: 0 })
+
     // 第1步：立即恢复滚动位置（同步执行，不等任何异步操作！）
     if (this.data._savedScrollTop > 0) {
       wx.pageScrollTo({ scrollTop: this.data._savedScrollTop, duration: 0 });
     }
 
-    // 第2步：局部更新被编辑的日记（不重载列表，列表长度不变）
+    // 第2步：从云数据库全量刷新列表（涵盖新增/编辑/删除所有场景）
     if (wx.getStorageSync('needRefreshHome')) {
       wx.removeStorageSync('needRefreshHome');
-      this._updateEditedDiary();
+      this._loadCloudDiaries(true);
     }
   },
 

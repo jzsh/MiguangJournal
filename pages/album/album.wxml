@@ -30,7 +30,7 @@
 
   <!-- 网格模式 -->
   <view class="grid-view" wx:if="{{viewMode === 'grid' && photos.length > 0}}">
-    <view class="grid-item" wx:for="{{photos}}" wx:key="index"
+    <view class="grid-item" wx:for="{{photos}}" wx:key="_id"
       bindtap="previewImage" data-src="{{item.src}}"
       bindlongpress="onLongPress" data-index="{{index}}">
       <image src="{{item.src}}" mode="aspectFill"></image>
@@ -39,7 +39,7 @@
 
   <!-- 列表模式 -->
   <view class="list-view" wx:if="{{viewMode === 'list' && photos.length > 0}}">
-    <view class="list-item" wx:for="{{photos}}" wx:key="index"
+    <view class="list-item" wx:for="{{photos}}" wx:key="_id"
       bindtap="previewImage" data-src="{{item.src}}"
       bindlongpress="onLongPress" data-index="{{index}}">
       <image src="{{item.src}}" mode="aspectFill"></image>

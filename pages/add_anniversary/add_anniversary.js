@@ -204,7 +204,7 @@ Page({
         await cloud.addDiary({ title: title.trim(), detail: detail.trim(), date, images: cloudImages, coverImage, content: detail.trim().split('\n'), mood, weather, location, locationData });
         wx.showToast({ title: '发布成功', icon: 'success' });
       }
-      // 标记首页需要刷新
+      // 标记首页需要刷新（通知已由 _logOperationInternal 自动触发）
       wx.setStorageSync('needRefreshHome', true);
       setTimeout(() => { wx.navigateBack({ delta: 1 }); }, 1200);
     } catch (err) {

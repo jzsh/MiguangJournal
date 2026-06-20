@@ -26,7 +26,7 @@ Page({
     this.setData({ diaries });
     // 恢复到云数据库
     if (item.originalData) {
-      wx.cloud.database().collection('diaries').add({ data: { ...item.originalData, createdAt: new Date(item.deletedAt), updatedAt: new Date() } }).then(() => {
+      cloud.restoreDiary(item.originalData).then(() => {
         wx.showToast({ title: '已恢复', icon: 'success' });
       }).catch(() => { wx.showToast({ title: '恢复失败', icon: 'none' }); });
     }
@@ -54,7 +54,7 @@ Page({
     wx.setStorageSync('recyclePhotos', photos);
     this.setData({ photos });
     if (item.fileID) {
-      wx.cloud.database().collection('photos').add({ data: { fileID: item.fileID, date: item.date || '', createdAt: new Date() } }).then(() => {
+      cloud.restorePhoto(item.fileID, item.date || '').then(() => {
         wx.showToast({ title: '已恢复', icon: 'success' });
       }).catch(() => { wx.showToast({ title: '恢复失败', icon: 'none' }); });
     }

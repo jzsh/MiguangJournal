@@ -1,6 +1,11 @@
 <!--index.wxml-->
 <view class="container">
 
+  <!-- 自定义导航栏 -->
+  <view class="nav-header" style="padding-top:{{navPaddingTop}}px;">
+    <text class="nav-title">觅光手记</text>
+  </view>
+
   <!-- 轮播图 -->
   <swiper class="swiper" wx:if="{{swiperList.length > 0}}" indicator-dots autoplay interval="4000" duration="800" circular>
     <swiper-item wx:for="{{swiperList}}" wx:key="*this">
